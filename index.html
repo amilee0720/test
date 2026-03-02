@@ -404,39 +404,54 @@ function legacyCopy(text) {
         // ...
     };
 document.addEventListener('DOMContentLoaded', async () => {
-    // ... 原有的初始化邏輯 ...
+    // 1. 基礎初始化
     initMobileFixes();
     initGlobalListeners();
     initCanvasListeners();
     trackLaunchMode();
-    loadCardData(); 
-    checkNews();
-    checkName(); 
-    
-    // 關鍵修正：確保卡片資料已從 JSON 載入完畢
-    await waitForCards(); 
 
+    // 2. 啟動資料載入
+    loadCardData(); 
+
+    // 3. 【關鍵】等待資料加載完成
+    // 這裡使用一個簡單的檢查機制，確保 allCards 已經有資料了
+    const checkDataReady = () => {
+        return new Promise((resolve) => {
+            const timer = setInterval(() => {
+                if (allCards && allCards.length > 0) {
+                    clearInterval(timer);
+                    resolve();
+                }
+            }, 100); // 每 0.1 秒檢查一次
+        });
+    };
+
+    await checkDataReady(); 
+    console.log("卡片資料已就緒，準備檢查禮物參數...");
+
+    // 4. 開始處理網址參數
     const urlParams = new URLSearchParams(window.location.search);
     const sharedId = urlParams.get('cardID');
-    const senderName = urlParams.get('from') || '親故';
+    const sender = urlParams.get('from') || '親故';
 
     if (sharedId) {
-        // 進入「驚喜禮物模式」
         const found = allCards.find(c => c.id === sharedId);
         if (found) {
-            // 1. 設定狀態與資料
+            console.log("找到分享卡片:", found.id);
+            
+            // 設定全域變數
             selectedMember = members.find(m => m.name === found.member_name);
             selectedImg = found.url;
             window.currentCard = found;
-            state = 'DRAWN'; // 跳過 IDLE，直接進入「已抽中」狀態
+            state = 'DRAWN'; // 設定狀態為「已翻牌」
 
-            // 2. 視覺呈現：顯示發送者資訊
+            // 修改 UI 顯示
             const quoteElem = document.getElementById('quote');
             if (quoteElem) {
-                quoteElem.innerHTML = `🎁 <b>${decodeURIComponent(senderName)}</b> 送來了心意小卡！<br>快刮開它吧 ✨`;
+                quoteElem.innerHTML = `🎁 <b>${decodeURIComponent(sender)}</b> 送來了心意小卡！<br>快刮開它吧 ✨`;
             }
 
-            // 3. 卡片翻面動畫
+            // 強制翻牌動畫
             const cardObj = document.getElementById('card-obj');
             const cardName = document.getElementById('card-name');
             if (cardObj && cardName) {
@@ -444,34 +459,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 cardObj.classList.add('flipped');
             }
 
-            // 4. 準備刮刮層
-            // 呼叫我們先前開發的安全載入器，把照片塞進 photo 區塊
+            // 初始化刮卡區域
+            // 使用我們先前開發的安全載入器
             if (typeof setSecureBg === 'function') {
                 setSecureBg(selectedImg, document.getElementById('photo'));
             } else {
                 document.getElementById('photo').style.backgroundImage = `url('${selectedImg}')`;
             }
-            
-            // 初始化 Canvas 準備讓朋友動手刮
             initCanvas();
 
-            // 5. GA 追蹤：有人點開了禮物
-            Tracker._send('shared_card_receive', { 
-                'photo_id': sharedId, 
-                'sender': senderName 
-            });
+            // 埋設 GA 追蹤
+            Tracker._send('shared_card_receive', { 'photo_id': sharedId, 'from': sender });
 
-            // 6. 清除網址參數，維持網址美觀（防止重新整理時重複進入禮物模式）
+            // 清除網址參數，避免重新整理時卡在禮物頁
             window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+            console.error("網址中的 cardID 在資料庫中不存在");
+            switchView('home');
         }
     } else {
-        // 沒有參數，正常進入首頁 IDLE 模式
         switchView('home'); 
     }
 
     updateUI(); 
 });
-
     </script>
 </body>
 </html>
