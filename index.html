@@ -309,37 +309,52 @@
         // --- 分享模組 ---
         function handleShare() { showModal('share-menu-modal'); }
 function executeLinkShare() {
+    // 1. 立即取得必要資訊，不進行非同步等待
+    const cardData = window.currentCard;
+    if (!cardData) {
+        showToast("錯誤：找不到卡片資訊");
+        return;
+    }
+
     const lang = i18n[currentLang];
-    // 1. 建立分享網址
-    const shareUrl = window.location.origin + window.location.pathname + `?cardID=${window.currentCard.id}&from=${encodeURIComponent(userName || 'COER')}`;
     
-    // 2. 建立分享內容 (增加 text 提高手機相容性)
+    // 2. 建立分享物件 (使用 window.location.href 確保路徑準確)
+    const baseUrl = window.location.href.split('?')[0];
+    const sender = userName || 'COER';
+    const shareUrl = `${baseUrl}?cardID=${cardData.id}&from=${encodeURIComponent(sender)}`;
+
     const shareData = {
         title: 'Your Daily CORTIS!',
-        text: `🎁 你的親故送給你一張 ${window.currentCard.member_name} 的限定小卡！快來拆開它吧！✨`,
+        text: `🎁 你的親故送給你一張 ${cardData.member_name} 的限定小卡！快來拆開它吧！✨`,
         url: shareUrl
     };
 
-    // 3. 執行分享邏輯
-    // 檢查瀏覽器是否支援，且目前是否為安全連線 (HTTPS)
-    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+    // 3. 埋設 GA 追蹤
+    Tracker._send('share_action_click', { 'type': 'link', 'photo_id': cardData.id });
+
+    // 4. 嘗試原生分享
+    if (navigator.share) {
         navigator.share(shareData)
             .then(() => {
-                console.log('分享成功');
                 closeModal('share-menu-modal');
             })
             .catch((err) => {
-                // 使用者取消分享時不動作，若是報錯則進入備援方案
-                if (err.name !== 'AbortError') {
-                    fallbackCopy(shareUrl);
+                // 如果是因為使用者「手動取消」，不需要報錯
+                if (err.name === 'AbortError') {
+                    console.log('User cancelled share');
+                } else {
+                    // 如果是其他原因失敗（例如 WebView 不支援），進入備援
+                    showToast("瀏覽器限制，改為複製連結");
+                    copyToClipboardFallback(shareUrl);
                 }
             });
     } else {
-        // 4. 備援方案：複製到剪貼簿
-        fallbackCopy(shareUrl);
+        // 5. 不支援原生分享（如電腦版或某些舊版 WebView）
+        copyToClipboardFallback(shareUrl);
     }
 }
-        async function executePosterSave() {
+
+async function executePosterSave() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 800; canvas.height = 1200;
@@ -355,24 +370,38 @@ function executeLinkShare() {
             }
         }
 
-        function fallbackCopy(text) {
-    // 優先使用現代 API，不支援則用傳統 execCommand
+function copyToClipboardFallback(text) {
+    const lang = i18n[currentLang];
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
-            showToast("連結已複製到剪貼簿！");
+            showToast(lang.shareSuccess || "連結已複製！");
             closeModal('share-menu-modal');
+        }).catch(() => {
+            // 如果 clipboard API 也失敗（某些 WebView 限制）
+            legacyCopy(text);
         });
     } else {
-        const tempInput = document.createElement('input');
-        document.body.appendChild(tempInput);
-        tempInput.value = text;
-        tempInput.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempInput);
-        showToast("連結已複製！");
-        closeModal('share-menu-modal');
+        legacyCopy(text);
     }
 }
+
+function legacyCopy(text) {
+    const lang = i18n[currentLang];
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+        document.execCommand('copy');
+        showToast(lang.shareSuccess || "連結已複製！");
+    } catch (err) {
+        showToast("無法複製連結，請手動複製");
+    }
+    document.body.removeChild(textArea);
+    closeModal('share-menu-modal');
+}
+
+
     </script>
 </body>
 </html>
