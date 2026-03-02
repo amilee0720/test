@@ -309,18 +309,19 @@
         // --- 分享模組 ---
         function handleShare() { showModal('share-menu-modal'); }
 function executeLinkShare() {
-    // 1. 立即取得必要資訊，不進行非同步等待
     const cardData = window.currentCard;
     if (!cardData) {
-        showToast("錯誤：找不到卡片資訊");
+        alert("找不到卡片資訊"); // 基礎反饋
         return;
     }
 
-    const lang = i18n[currentLang];
+    // 取得語系文字，若讀不到 i18n 則使用預設文字避免崩潰
+    const langData = (typeof i18n !== 'undefined' && typeof currentLang !== 'undefined') 
+        ? i18n[currentLang] 
+        : { shareSuccess: "連結已複製！" };
     
-    // 2. 建立分享物件 (使用 window.location.href 確保路徑準確)
-    const baseUrl = window.location.href.split('?')[0];
-    const sender = userName || 'COER';
+    const baseUrl = window.location.origin + window.location.pathname;
+    const sender = (typeof userName !== 'undefined') ? userName : 'COER';
     const shareUrl = `${baseUrl}?cardID=${cardData.id}&from=${encodeURIComponent(sender)}`;
 
     const shareData = {
@@ -329,31 +330,26 @@ function executeLinkShare() {
         url: shareUrl
     };
 
-    // 3. 埋設 GA 追蹤
-    Tracker._send('share_action_click', { 'type': 'link', 'photo_id': cardData.id });
+    // 埋設 GA 追蹤
+    if (typeof Tracker !== 'undefined') {
+        Tracker._send('share_action_click', { 'type': 'link', 'photo_id': cardData.id });
+    }
 
-    // 4. 嘗試原生分享
+    // 嘗試調用原生分享
     if (navigator.share) {
         navigator.share(shareData)
             .then(() => {
-                closeModal('share-menu-modal');
+                if (typeof closeModal === 'function') closeModal('share-menu-modal');
             })
             .catch((err) => {
-                // 如果是因為使用者「手動取消」，不需要報錯
-                if (err.name === 'AbortError') {
-                    console.log('User cancelled share');
-                } else {
-                    // 如果是其他原因失敗（例如 WebView 不支援），進入備援
-                    showToast("瀏覽器限制，改為複製連結");
-                    copyToClipboardFallback(shareUrl);
+                if (err.name !== 'AbortError') {
+                    copyToClipboardFallback(shareUrl, langData.shareSuccess);
                 }
             });
     } else {
-        // 5. 不支援原生分享（如電腦版或某些舊版 WebView）
-        copyToClipboardFallback(shareUrl);
+        copyToClipboardFallback(shareUrl, langData.shareSuccess);
     }
 }
-
 async function executePosterSave() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -400,6 +396,13 @@ function legacyCopy(text) {
     document.body.removeChild(textArea);
     closeModal('share-menu-modal');
 }
+
+   const publicAPI = {
+        // ... 原有的內容 ...
+        executeLinkShare,
+        executePosterSave,
+        // ...
+    };
 
 
     </script>
