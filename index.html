@@ -403,7 +403,74 @@ function legacyCopy(text) {
         executePosterSave,
         // ...
     };
+document.addEventListener('DOMContentLoaded', async () => {
+    // ... 原有的初始化邏輯 ...
+    initMobileFixes();
+    initGlobalListeners();
+    initCanvasListeners();
+    trackLaunchMode();
+    loadCardData(); 
+    checkNews();
+    checkName(); 
+    
+    // 關鍵修正：確保卡片資料已從 JSON 載入完畢
+    await waitForCards(); 
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedId = urlParams.get('cardID');
+    const senderName = urlParams.get('from') || '親故';
+
+    if (sharedId) {
+        // 進入「驚喜禮物模式」
+        const found = allCards.find(c => c.id === sharedId);
+        if (found) {
+            // 1. 設定狀態與資料
+            selectedMember = members.find(m => m.name === found.member_name);
+            selectedImg = found.url;
+            window.currentCard = found;
+            state = 'DRAWN'; // 跳過 IDLE，直接進入「已抽中」狀態
+
+            // 2. 視覺呈現：顯示發送者資訊
+            const quoteElem = document.getElementById('quote');
+            if (quoteElem) {
+                quoteElem.innerHTML = `🎁 <b>${decodeURIComponent(senderName)}</b> 送來了心意小卡！<br>快刮開它吧 ✨`;
+            }
+
+            // 3. 卡片翻面動畫
+            const cardObj = document.getElementById('card-obj');
+            const cardName = document.getElementById('card-name');
+            if (cardObj && cardName) {
+                cardName.innerText = selectedMember.name;
+                cardObj.classList.add('flipped');
+            }
+
+            // 4. 準備刮刮層
+            // 呼叫我們先前開發的安全載入器，把照片塞進 photo 區塊
+            if (typeof setSecureBg === 'function') {
+                setSecureBg(selectedImg, document.getElementById('photo'));
+            } else {
+                document.getElementById('photo').style.backgroundImage = `url('${selectedImg}')`;
+            }
+            
+            // 初始化 Canvas 準備讓朋友動手刮
+            initCanvas();
+
+            // 5. GA 追蹤：有人點開了禮物
+            Tracker._send('shared_card_receive', { 
+                'photo_id': sharedId, 
+                'sender': senderName 
+            });
+
+            // 6. 清除網址參數，維持網址美觀（防止重新整理時重複進入禮物模式）
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    } else {
+        // 沒有參數，正常進入首頁 IDLE 模式
+        switchView('home'); 
+    }
+
+    updateUI(); 
+});
 
     </script>
 </body>
