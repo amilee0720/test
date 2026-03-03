@@ -351,20 +351,94 @@ function executeLinkShare() {
     }
 }
 async function executePosterSave() {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 800; canvas.height = 1200;
-            ctx.fillStyle = '#fff'; ctx.fillRect(0,0,800,1200);
-            const img = new Image(); img.crossOrigin = "anonymous"; img.src = window.currentCard.url;
-            img.onload = () => {
-                ctx.save(); ctx.beginPath(); ctx.roundRect(60, 60, 680, 1020, 40); ctx.clip();
-                ctx.drawImage(img, 60, 60, 680, 1020); ctx.restore();
-                ctx.textAlign = 'center'; ctx.fillStyle = '#333'; ctx.font = 'bold 40px sans-serif';
-                ctx.fillText(window.currentCard.member_name, 400, 1130);
-                document.getElementById('poster-img').src = canvas.toDataURL('image/jpeg');
-                closeModal('share-menu-modal'); showModal('poster-modal');
-            }
-        }
+    const lang = i18n[currentLang];
+    showToast(lang.posterGenerating || "正在製作精美海報...");
+    Tracker._send('share_action_click', { 'type': 'poster', 'photo_id': viewedCard.id });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // 設定高解析度尺寸 1200 x 1800 (適合 IG Story)
+    canvas.width = 1200;
+    canvas.height = 1800;
+
+    // 1. 繪製背景：絲綢白漸層
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    bgGrad.addColorStop(0, '#ffffff');
+    bgGrad.addColorStop(1, '#f2f2f2');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const img = new Image();
+    img.crossOrigin = "anonymous"; 
+    img.src = viewedCard.url;
+
+    img.onload = () => {
+        // 設定佈局參數
+        const pad = 100;
+        const cardW = canvas.width - (pad * 2);
+        const cardH = cardW * (3/2);
+        const centerX = canvas.width / 2;
+
+        // 2. 繪製卡片影子 (增加立體感)
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+        ctx.shadowBlur = 50;
+        ctx.shadowOffsetY = 20;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.roundRect(pad, pad, cardW, cardH, 60);
+        ctx.fill();
+        ctx.restore();
+
+        // 3. 繪製主照片 (加上圓角切割)
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(pad, pad, cardW, cardH, 60);
+        ctx.clip();
+        ctx.drawImage(img, pad, pad, cardW, cardH);
+        
+        // 增加一個淡淡的光澤層 (增加質感)
+        const shineGrad = ctx.createLinearGradient(pad, pad, pad + cardW, pad + cardH);
+        shineGrad.addColorStop(0, 'rgba(255,255,255,0.1)');
+        shineGrad.addColorStop(0.5, 'rgba(255,255,255,0)');
+        shineGrad.addColorStop(1, 'rgba(0,0,0,0.05)');
+        ctx.fillStyle = shineGrad;
+        ctx.fillRect(pad, pad, cardW, cardH);
+        ctx.restore();
+
+        // 4. 底部文字設計
+        // 繪製團員名字
+        ctx.fillStyle = '#333333';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 72px "PingFang TC", "Microsoft JhengHei", sans-serif';
+        ctx.letterSpacing = "4px";
+        ctx.fillText(viewedCard.member_name, centerX, cardH + pad + 150);
+
+        // 繪製卡片編號
+        ctx.fillStyle = '#999999';
+        ctx.font = '600 32px monospace';
+        ctx.fillText(`ID: ${viewedCard.id}`, centerX, cardH + pad + 210);
+
+        // 5. 品牌 Logo 與 裝飾
+        ctx.fillStyle = '#f853a0';
+        ctx.font = '900 42px sans-serif';
+        ctx.fillText('Your Daily CORTIS!', centerX, cardH + pad + 300);
+        
+        // 繪製當天日期 (像限定收藏證明)
+        const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        ctx.fillStyle = '#cccccc';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.fillText(`COLLECTED ON ${dateStr.toUpperCase()}`, centerX, canvas.height - 80);
+
+        // 6. 輸出結果
+        const resultImg = document.getElementById('poster-img');
+        resultImg.src = canvas.toDataURL('image/jpeg', 0.95);
+        
+        closeModal('share-menu-modal');
+        showModal('poster-modal');
+    };
+}
 
 function copyToClipboardFallback(text) {
     const lang = i18n[currentLang];
