@@ -351,95 +351,68 @@ function executeLinkShare() {
     }
 }
 async function executePosterSave() {
-    const lang = i18n[currentLang];
-    showToast(lang.posterGenerating || "正在製作精美海報...");
-    Tracker._send('share_action_click', { 'type': 'poster', 'photo_id': viewedCard.id });
+    const cardData = window.currentCard;
+    if (!cardData) return;
+
+    // 安全取得語系
+    const langData = (typeof i18n !== 'undefined' && typeof currentLang !== 'undefined') 
+        ? i18n[currentLang] 
+        : { posterGenerating: "正在製作海報..." };
+
+    if (typeof showToast === 'function') showToast(langData.posterGenerating);
+    if (typeof Tracker !== 'undefined') Tracker._send('share_action_click', { 'type': 'poster', 'photo_id': cardData.id });
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    
-    // 設定高解析度尺寸 1200 x 1800 (適合 IG Story)
-    canvas.width = 1200;
-    canvas.height = 1800;
+    canvas.width = 1200; canvas.height = 1800;
 
-    // 1. 繪製背景：絲綢白漸層
     const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    bgGrad.addColorStop(0, '#ffffff');
-    bgGrad.addColorStop(1, '#f2f2f2');
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    bgGrad.addColorStop(0, '#ffffff'); bgGrad.addColorStop(1, '#f2f2f2');
+    ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const img = new Image();
     img.crossOrigin = "anonymous"; 
-    img.src = viewedCard.url;
+    img.src = cardData.url;
 
     img.onload = () => {
-        // 設定佈局參數
         const pad = 100;
         const cardW = canvas.width - (pad * 2);
         const cardH = cardW * (3/2);
         const centerX = canvas.width / 2;
 
-        // 2. 繪製卡片影子 (增加立體感)
+        // 1. 影子
         ctx.save();
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
-        ctx.shadowBlur = 50;
-        ctx.shadowOffsetY = 20;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.1)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 20;
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.roundRect(pad, pad, cardW, cardH, 60);
-        ctx.fill();
+        ctx.beginPath(); ctx.roundRect(pad, pad, cardW, cardH, 60); ctx.fill();
         ctx.restore();
 
-        // 3. 繪製主照片 (加上圓角切割)
+        // 2. 照片
         ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(pad, pad, cardW, cardH, 60);
-        ctx.clip();
+        ctx.beginPath(); ctx.roundRect(pad, pad, cardW, cardH, 60); ctx.clip();
         ctx.drawImage(img, pad, pad, cardW, cardH);
-        
-        // 增加一個淡淡的光澤層 (增加質感)
-        const shineGrad = ctx.createLinearGradient(pad, pad, pad + cardW, pad + cardH);
-        shineGrad.addColorStop(0, 'rgba(255,255,255,0.1)');
-        shineGrad.addColorStop(0.5, 'rgba(255,255,255,0)');
-        shineGrad.addColorStop(1, 'rgba(0,0,0,0.05)');
-        ctx.fillStyle = shineGrad;
-        ctx.fillRect(pad, pad, cardW, cardH);
         ctx.restore();
 
-        // 4. 底部文字設計
-        // 繪製團員名字
-        ctx.fillStyle = '#333333';
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 72px "PingFang TC", "Microsoft JhengHei", sans-serif';
-        ctx.letterSpacing = "4px";
-        ctx.fillText(viewedCard.member_name, centerX, cardH + pad + 150);
+        // 3. 文字
+        ctx.fillStyle = '#333333'; ctx.textAlign = 'center';
+        ctx.font = 'bold 72px sans-serif';
+        ctx.fillText(cardData.member_name, centerX, cardH + pad + 150);
 
-        // 繪製卡片編號
-        ctx.fillStyle = '#999999';
-        ctx.font = '600 32px monospace';
-        ctx.fillText(`ID: ${viewedCard.id}`, centerX, cardH + pad + 210);
+        ctx.fillStyle = '#999999'; ctx.font = '600 32px monospace';
+        ctx.fillText(`ID: ${cardData.id}`, centerX, cardH + pad + 210);
 
-        // 5. 品牌 Logo 與 裝飾
-        ctx.fillStyle = '#f853a0';
-        ctx.font = '900 42px sans-serif';
+        ctx.fillStyle = '#f853a0'; ctx.font = '900 42px sans-serif';
         ctx.fillText('Your Daily CORTIS!', centerX, cardH + pad + 300);
-        
-        // 繪製當天日期 (像限定收藏證明)
-        const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-        ctx.fillStyle = '#cccccc';
-        ctx.font = 'bold 28px sans-serif';
-        ctx.fillText(`COLLECTED ON ${dateStr.toUpperCase()}`, centerX, canvas.height - 80);
 
-        // 6. 輸出結果
+        // 4. 輸出
         const resultImg = document.getElementById('poster-img');
-        resultImg.src = canvas.toDataURL('image/jpeg', 0.95);
-        
-        closeModal('share-menu-modal');
-        showModal('poster-modal');
+        if (resultImg) {
+            resultImg.src = canvas.toDataURL('image/jpeg', 0.95);
+            if (typeof closeModal === 'function') closeModal('share-menu-modal');
+            if (typeof showModal === 'function') showModal('poster-modal');
+        }
     };
 }
-
 function copyToClipboardFallback(text) {
     const lang = i18n[currentLang];
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -471,92 +444,59 @@ function legacyCopy(text) {
     closeModal('share-menu-modal');
 }
 
+
+document.addEventListener('DOMContentLoaded', async () => {
+        // 1. 呼叫原本內部的初始化 (現在在內部了，不會報錯)
+        if (typeof initMobileFixes === 'function') initMobileFixes();
+        if (typeof initGlobalListeners === 'function') initGlobalListeners();
+        if (typeof initCanvasListeners === 'function') initCanvasListeners();
+        if (typeof trackLaunchMode === 'function') trackLaunchMode();
+        if (typeof loadCardData === 'function') loadCardData(); 
+        if (typeof checkNews === 'function') checkNews();
+        if (typeof checkName === 'function') checkName(); 
+
+        // 2. 等待資料
+        const checkReady = () => new Promise(res => {
+            const t = setInterval(() => { if (allCards.length > 0) { clearInterval(t); res(); } }, 100);
+        });
+        await checkReady();
+
+        // 3. 檢查禮物參數
+        const params = new URLSearchParams(window.location.search);
+        const sharedId = params.get('cardID');
+        const from = params.get('from') || '親故';
+
+        if (sharedId) {
+            const found = allCards.find(c => c.id === sharedId);
+            if (found) {
+                selectedMember = members.find(m => m.name === found.member_name);
+                selectedImg = found.url;
+                window.currentCard = found;
+                state = 'DRAWN';
+                
+                const q = document.getElementById('quote');
+                if (q) q.innerHTML = `🎁 <b>${decodeURIComponent(from)}</b> 送來了心意小卡！<br>快刮開它吧 ✨`;
+
+                const obj = document.getElementById('card-obj');
+                const nm = document.getElementById('card-name');
+                if (obj && nm) { nm.innerText = selectedMember.name; obj.classList.add('flipped'); }
+
+                if (typeof setSecureBg === 'function') setSecureBg(selectedImg, document.getElementById('photo'));
+                initCanvas();
+                if (typeof Tracker !== 'undefined') Tracker._send('shared_card_receive', { 'photo_id': sharedId, 'from': from });
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        } else {
+            if (typeof switchView === 'function') switchView('home'); 
+        }
+        if (typeof updateUI === 'function') updateUI(); 
+    });
    const publicAPI = {
         // ... 原有的內容 ...
         executeLinkShare,
         executePosterSave,
         // ...
     };
-document.addEventListener('DOMContentLoaded', async () => {
-    // 1. 基礎初始化
-    initMobileFixes();
-    initGlobalListeners();
-    initCanvasListeners();
-    trackLaunchMode();
-
-    // 2. 啟動資料載入
-    loadCardData(); 
-
-    // 3. 【關鍵】等待資料加載完成
-    // 這裡使用一個簡單的檢查機制，確保 allCards 已經有資料了
-    const checkDataReady = () => {
-        return new Promise((resolve) => {
-            const timer = setInterval(() => {
-                if (allCards && allCards.length > 0) {
-                    clearInterval(timer);
-                    resolve();
-                }
-            }, 100); // 每 0.1 秒檢查一次
-        });
-    };
-
-    await checkDataReady(); 
-    console.log("卡片資料已就緒，準備檢查禮物參數...");
-
-    // 4. 開始處理網址參數
-    const urlParams = new URLSearchParams(window.location.search);
-    const sharedId = urlParams.get('cardID');
-    const sender = urlParams.get('from') || '親故';
-
-    if (sharedId) {
-        const found = allCards.find(c => c.id === sharedId);
-        if (found) {
-            console.log("找到分享卡片:", found.id);
-            
-            // 設定全域變數
-            selectedMember = members.find(m => m.name === found.member_name);
-            selectedImg = found.url;
-            window.currentCard = found;
-            state = 'DRAWN'; // 設定狀態為「已翻牌」
-
-            // 修改 UI 顯示
-            const quoteElem = document.getElementById('quote');
-            if (quoteElem) {
-                quoteElem.innerHTML = `🎁 <b>${decodeURIComponent(sender)}</b> 送來了心意小卡！<br>快刮開它吧 ✨`;
-            }
-
-            // 強制翻牌動畫
-            const cardObj = document.getElementById('card-obj');
-            const cardName = document.getElementById('card-name');
-            if (cardObj && cardName) {
-                cardName.innerText = selectedMember.name;
-                cardObj.classList.add('flipped');
-            }
-
-            // 初始化刮卡區域
-            // 使用我們先前開發的安全載入器
-            if (typeof setSecureBg === 'function') {
-                setSecureBg(selectedImg, document.getElementById('photo'));
-            } else {
-                document.getElementById('photo').style.backgroundImage = `url('${selectedImg}')`;
-            }
-            initCanvas();
-
-            // 埋設 GA 追蹤
-            Tracker._send('shared_card_receive', { 'photo_id': sharedId, 'from': sender });
-
-            // 清除網址參數，避免重新整理時卡在禮物頁
-            window.history.replaceState({}, document.title, window.location.pathname);
-        } else {
-            console.error("網址中的 cardID 在資料庫中不存在");
-            switchView('home');
-        }
-    } else {
-        switchView('home'); 
-    }
-
-    updateUI(); 
-});
     </script>
 </body>
 </html>
