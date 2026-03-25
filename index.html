@@ -1,50 +1,21 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>惡意攻擊模擬器</title>
-</head>
-<body>
-    <h1>這是外部非法網頁</h1>
-    <p>按下按鈕，嘗試往別人的資料庫塞垃圾資料...</p>
-    <button id="attackBtn">啟動攻擊</button>
-    <div id="log" style="background:#eee; padding:10px; margin-top:20px; font-family:monospace;"></div>
+<button onclick="testApi()">測試 API Key</button>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+<script>
+async function testApi() {
+    const apiKey = "AIzaSyC_5C4OSzqCx2k17kw7zIN8fhmOIkglXgI";
 
-        // 【請貼上你自己的 Firebase 配置】
-        const firebaseConfig = {
-            apiKey: "AIzaSyC_5C4OSzqCx2k17kw7zIN8fhmOIkglXgI",
-            authDomain: "cortis-cards-dev.web.app",
-            projectId: "cortis-cards-dev",
-            storageBucket: "cortis-cards-dev.firebasestorage.app",
-            messagingSenderId: "747076104492",
-            appId: "1:747076104492:web:6d6714b5df97ed3495bc89",
-        };
+    const url = `https://firestore.googleapis.com/v1/projects/cortis-cards-dev/databases/(default)/documents/users/test?key=${apiKey}`;
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+    try {
+        const res = await fetch(url);
+        const text = await res.text();
 
-        document.getElementById('attackBtn').onclick = async () => {
-            const logger = document.getElementById('log');
-            logger.innerHTML += "嘗試寫入資料...<br>";
+        console.log("status:", res.status);
+        console.log(text);
 
-            try {
-                // 模擬攻擊者嘗試在一個他們隨便猜的集合 'global_stats' 寫入資料
-                // 或者嘗試在 'users/fake_user_123' 建立資料
-                await setDoc(doc(db, "users", "hacker_test_999"), {
-                    nickname: "我是壞人",
-                    collectedIds: { "MARTIN_0001": 9999 },
-                    isHacked: true
-                });
-
-                logger.innerHTML += "<span style='color:red;'>成功！垃圾資料已灌入。請查看 Firebase Console。</span><br>";
-            } catch (e) {
-                logger.innerHTML += "<span style='color:green;'>被攔截！錯誤原因：" + e.message + "</span><br>";
-                console.error(e);
-            }
-        };
-    </script>
-</body>
-</html>
+        alert("status: " + res.status);
+    } catch (e) {
+        console.error(e);
+    }
+}
+</script>
